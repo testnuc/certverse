@@ -3,6 +3,7 @@ import { SearchBar } from "@/components/SearchBar";
 import { CertificateTable } from "@/components/CertificateTable";
 import { Certificate, searchCertificates } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Heart } from "lucide-react";
 
 type SearchFilter = "domain" | "organization" | "fingerprint" | "id" | "root";
 
@@ -24,6 +25,22 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-black text-white p-8">
       <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+          Created by{" "}
+          <a 
+            href="https://www.hackwithsingh.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-white hover:text-gray-300 transition-colors"
+          >
+            www.hackwithsingh.com
+          </a>{" "}
+          <Heart 
+            className="w-4 h-4 text-[#ea384c] animate-pulse" 
+            fill="#ea384c"
+          />
+        </div>
+
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold">Certificate Search</h1>
           <p className="text-gray-400">
