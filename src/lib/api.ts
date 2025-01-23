@@ -1,7 +1,6 @@
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { saveQuery } from "./database";
-import { fetchWithRetry } from "./utils";
 
 export interface Certificate {
   issuer_ca_id: number;
@@ -32,6 +31,7 @@ export const searchCertificates = async (
 
     if (error) {
       console.error('Supabase function error:', error);
+      toast.error("Failed to fetch certificates");
       throw error;
     }
 
@@ -42,7 +42,7 @@ export const searchCertificates = async (
     return data;
   } catch (error) {
     console.error('Error fetching certificates:', error);
-    toast.error("Failed to fetch certificates. Retrying...");
+    toast.error("Failed to fetch certificates. Please try again.");
     return [];
   }
 };

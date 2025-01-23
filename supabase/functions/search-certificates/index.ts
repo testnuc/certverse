@@ -41,35 +41,6 @@ async function fetchWithRetry(url: string, retries = 3, initialDelay = 1000): Pr
   throw lastError || new Error('All retry attempts failed');
 }
 
-async function checkCachedResults(query: string, filter: string) {
-  const { data: certificates } = await supabase
-    .from('crt')
-    .select('*')
-    .eq('domain', query)
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  if (certificates && certificates.length > 0) {
-    const cacheAge = Date.now() - new Date(certificates[0].created_at).getTime();
-    if (cacheAge < 3600000) { // 1 hour cache
-      return certificates;
-    }
-  }
-  return null;
-}
-
-async function storeCertificates(certificates: any[], domain: string) {
-  for (const cert of certificates) {
-    await supabase.from('crt').insert({
-      common_name: cert.common_name,
-      issuer_name: cert.issuer_name,
-      not_before: cert.not_before,
-      not_after: cert.not_after,
-      domain: domain
-    });
-  }
-}
-
 function buildSearchUrl(query: string, filter: string): string {
   const baseUrl = 'https://crt.sh/';
   const params = new URLSearchParams();
@@ -117,23 +88,21 @@ serve(async (req) => {
 
     console.log(`Searching certificates for ${filter}: ${query}`);
     
-    // Check cache first
-    const cachedResults = await checkCachedResults(query, filter);
-    if (cachedResults) {
-      console.log('Returning cached results');
-      return new Response(
-        JSON.stringify(cachedResults),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // If not in cache, fetch from crt.sh with retry mechanism
+    // Fetch from crt.sh with retry mechanism
     const searchUrl = buildSearchUrl(query, filter);
+    console.log('Fetching from URL:', searchUrl);
+    
     const response = await fetchWithRetry(searchUrl);
     const data = await response.json();
     
-    // Store results in cache
-    await storeCertificates(data, query);
+    // Store the search query
+    try {
+      await supabase
+        .from('domain_searches')
+        .insert([{ domain: query }]);
+    } catch (error) {
+      console.error('Error saving search query:', error);
+    }
     
     return new Response(
       JSON.stringify(data),
