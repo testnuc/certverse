@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      crt: {
+        Row: {
+          common_name: string
+          created_at: string
+          domain: string
+          id: string
+          issuer_name: string
+          not_after: string
+          not_before: string
+        }
+        Insert: {
+          common_name: string
+          created_at?: string
+          domain: string
+          id?: string
+          issuer_name: string
+          not_after: string
+          not_before: string
+        }
+        Update: {
+          common_name?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          issuer_name?: string
+          not_after?: string
+          not_before?: string
+        }
+        Relationships: []
+      }
       domain_searches: {
         Row: {
           created_at: string

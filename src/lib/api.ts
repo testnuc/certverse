@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Certificate {
   issuer_ca_id: number;
@@ -14,17 +15,17 @@ export interface Certificate {
 
 export const searchCertificates = async (query: string): Promise<Certificate[]> => {
   try {
-    const response = await fetch(
-      `https://crt.sh/?q=${encodeURIComponent(query)}&output=json`
-    );
-    
-    if (!response.ok) {
-      throw new Error("Failed to fetch certificates");
+    const { data, error } = await supabase.functions.invoke('search-certificates', {
+      body: { query }
+    });
+
+    if (error) {
+      throw error;
     }
 
-    const data = await response.json();
-    return data;
+    return data || [];
   } catch (error) {
+    console.error('Error fetching certificates:', error);
     toast.error("Failed to fetch certificates");
     return [];
   }
