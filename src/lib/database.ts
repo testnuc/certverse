@@ -6,7 +6,7 @@ export interface QueryLog {
   type: string;
 }
 
-const fallbackLogs: QueryLog[] = [];
+let fallbackLogs: QueryLog[] = [];
 
 export async function saveQuery(query: string, type: string): Promise<void> {
   const log: QueryLog = {
