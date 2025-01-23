@@ -18,22 +18,20 @@ async function fetchWithRetry(url: string, retries = 3, initialDelay = 1000): Pr
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const response = await fetch(url, {
-        signal: AbortSignal.timeout(30000), // 30 second timeout
+        signal: AbortSignal.timeout(30000),
       });
       
       if (response.ok) {
         return response;
       }
       
-      console.log(`Attempt ${attempt + 1} failed, ${retries - attempt - 1} retries left`);
       if (attempt < retries - 1) {
         await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2; // Exponential backoff
+        delay *= 2;
       }
     } catch (error) {
       lastError = error as Error;
       if (attempt === retries - 1) throw error;
-      console.error(`Attempt ${attempt + 1} error:`, error);
       await new Promise(resolve => setTimeout(resolve, delay));
       delay *= 2;
     }
@@ -60,7 +58,7 @@ function buildSearchUrl(query: string, filter: string): string {
       params.set('rootIncluded', 'true');
       params.set('q', query);
       break;
-    default: // domain
+    default:
       params.set('q', query);
   }
   
@@ -85,31 +83,17 @@ serve(async (req) => {
         }
       );
     }
-
-    console.log(`Searching certificates for ${filter}: ${query}`);
     
-    // Fetch from crt.sh with retry mechanism
     const searchUrl = buildSearchUrl(query, filter);
-    console.log('Fetching from URL:', searchUrl);
-    
     const response = await fetchWithRetry(searchUrl);
     const data = await response.json();
-    
-    // Store the search query
-    try {
-      await supabase
-        .from('domain_searches')
-        .insert([{ domain: query }]);
-    } catch (error) {
-      console.error('Error saving search query:', error);
-    }
     
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to fetch certificates' }),
       { 

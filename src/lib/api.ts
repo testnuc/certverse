@@ -32,7 +32,7 @@ export const searchCertificates = async (
     if (error) {
       console.error('Supabase function error:', error);
       toast.error("Failed to fetch certificates");
-      throw error;
+      return [];
     }
 
     if (!data) {
