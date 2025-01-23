@@ -15,6 +15,11 @@ export interface Certificate {
 
 export const searchCertificates = async (query: string): Promise<Certificate[]> => {
   try {
+    // Store the search query
+    await supabase
+      .from('domain_searches')
+      .insert([{ domain: query }]);
+
     const { data, error } = await supabase.functions.invoke('search-certificates', {
       body: { query }
     });
