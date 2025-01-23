@@ -12,8 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url)
-    const query = url.searchParams.get('query')
+    const { query } = await req.json()
 
     if (!query) {
       return new Response(
@@ -30,6 +29,10 @@ serve(async (req) => {
     const response = await fetch(
       `https://crt.sh/?q=${encodeURIComponent(query)}&output=json`
     )
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch from crt.sh: ${response.statusText}`)
+    }
     
     const data = await response.json()
     

@@ -20,10 +20,15 @@ export const searchCertificates = async (query: string): Promise<Certificate[]> 
     });
 
     if (error) {
+      console.error('Supabase function error:', error);
       throw error;
     }
 
-    return data || [];
+    if (!data) {
+      return [];
+    }
+
+    return data;
   } catch (error) {
     console.error('Error fetching certificates:', error);
     toast.error("Failed to fetch certificates");
