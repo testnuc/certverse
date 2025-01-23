@@ -22,9 +22,9 @@ export const searchCertificates = async (
 ): Promise<Certificate[]> => {
   try {
     // First save the search query
-    await saveQuery(query, filter);
+    await saveQuery(query);
 
-    // Then perform the search via Edge Function with retry mechanism
+    // Then perform the search via Edge Function
     const { data, error } = await supabase.functions.invoke('search-certificates', {
       body: { query, filter }
     });
