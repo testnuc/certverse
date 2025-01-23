@@ -11,46 +11,42 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
-async function fetchWithRetry(query: string, retries = 3): Promise<Response> {
+async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(
-        `https://crt.sh/?q=${encodeURIComponent(query)}&output=json`
-      )
+      const response = await fetch(url);
       
       if (response.ok) {
-        return response
+        return response;
       }
       
-      console.log(`Attempt ${attempt} failed, ${retries - attempt} retries left`)
+      console.log(`Attempt ${attempt} failed, ${retries - attempt} retries left`);
       if (attempt < retries) {
-        // Wait for 1 second before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     } catch (error) {
-      if (attempt === retries) throw error
-      console.error(`Attempt ${attempt} error:`, error)
+      if (attempt === retries) throw error;
+      console.error(`Attempt ${attempt} error:`, error);
     }
   }
-  throw new Error('All retry attempts failed')
+  throw new Error('All retry attempts failed');
 }
 
-async function checkCachedResults(query: string) {
+async function checkCachedResults(query: string, filter: string) {
   const { data: certificates } = await supabase
     .from('crt')
     .select('*')
     .eq('domain', query)
     .order('created_at', { ascending: false })
-    .limit(1)
+    .limit(1);
 
   if (certificates && certificates.length > 0) {
-    const cacheAge = Date.now() - new Date(certificates[0].created_at).getTime()
-    // Return cached results if less than 1 hour old
+    const cacheAge = Date.now() - new Date(certificates[0].created_at).getTime();
     if (cacheAge < 3600000) {
-      return certificates
+      return certificates;
     }
   }
-  return null
+  return null;
 }
 
 async function storeCertificates(certificates: any[], domain: string) {
@@ -61,18 +57,44 @@ async function storeCertificates(certificates: any[], domain: string) {
       not_before: cert.not_before,
       not_after: cert.not_after,
       domain: domain
-    })
+    });
   }
 }
 
+function buildSearchUrl(query: string, filter: string): string {
+  const baseUrl = 'https://crt.sh/';
+  const params = new URLSearchParams();
+  
+  switch (filter) {
+    case 'organization':
+      params.set('O', query);
+      break;
+    case 'fingerprint':
+      params.set('sha256', query);
+      break;
+    case 'id':
+      params.set('caid', query);
+      break;
+    case 'root':
+      params.set('exclude', 'expired');
+      params.set('rootIncluded', 'true');
+      params.set('q', query);
+      break;
+    default: // domain
+      params.set('q', query);
+  }
+  
+  params.set('output', 'json');
+  return `${baseUrl}?${params.toString()}`;
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { query } = await req.json()
+    const { query, filter = 'domain' } = await req.json();
 
     if (!query) {
       return new Response(
@@ -81,40 +103,38 @@ serve(async (req) => {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      )
+      );
     }
 
-    console.log(`Searching certificates for domain: ${query}`)
+    console.log(`Searching certificates for ${filter}: ${query}`);
     
-    // Check cache first
-    const cachedResults = await checkCachedResults(query)
+    const cachedResults = await checkCachedResults(query, filter);
     if (cachedResults) {
-      console.log('Returning cached results')
+      console.log('Returning cached results');
       return new Response(
         JSON.stringify(cachedResults),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    // If no cache, fetch from crt.sh with retry logic
-    const response = await fetchWithRetry(query)
-    const data = await response.json()
+    const searchUrl = buildSearchUrl(query, filter);
+    const response = await fetchWithRetry(searchUrl);
+    const data = await response.json();
     
-    // Store results in database for future queries
-    await storeCertificates(data, query)
+    await storeCertificates(data, query);
     
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
-    console.error('Error:', error.message)
+    console.error('Error:', error.message);
     return new Response(
       JSON.stringify({ error: 'Failed to fetch certificates' }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    )
+    );
   }
-})
+});

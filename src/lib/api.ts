@@ -13,7 +13,12 @@ export interface Certificate {
   serial_number: string;
 }
 
-export const searchCertificates = async (query: string): Promise<Certificate[]> => {
+type SearchFilter = "domain" | "organization" | "fingerprint" | "id" | "root";
+
+export const searchCertificates = async (
+  query: string, 
+  filter: SearchFilter = "domain"
+): Promise<Certificate[]> => {
   try {
     // Store the search query
     await supabase
@@ -21,7 +26,7 @@ export const searchCertificates = async (query: string): Promise<Certificate[]> 
       .insert([{ domain: query }]);
 
     const { data, error } = await supabase.functions.invoke('search-certificates', {
-      body: { query }
+      body: { query, filter }
     });
 
     if (error) {
