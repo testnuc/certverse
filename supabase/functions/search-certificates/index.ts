@@ -1,35 +1,44 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-)
+);
 
-async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
+async function fetchWithRetry(url: string, retries = 3, initialDelay = 1000): Promise<Response> {
+  let lastError: Error | null = null;
+  let delay = initialDelay;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(30000), // 30 second timeout
+      });
       
       if (response.ok) {
         return response;
       }
       
-      console.log(`Attempt ${attempt} failed, ${retries - attempt} retries left`);
-      if (attempt < retries) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`Attempt ${attempt + 1} failed, ${retries - attempt - 1} retries left`);
+      if (attempt < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
       }
     } catch (error) {
-      if (attempt === retries) throw error;
-      console.error(`Attempt ${attempt} error:`, error);
+      lastError = error as Error;
+      if (attempt === retries - 1) throw error;
+      console.error(`Attempt ${attempt + 1} error:`, error);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2;
     }
   }
-  throw new Error('All retry attempts failed');
+  throw lastError || new Error('All retry attempts failed');
 }
 
 async function checkCachedResults(query: string, filter: string) {
@@ -42,7 +51,7 @@ async function checkCachedResults(query: string, filter: string) {
 
   if (certificates && certificates.length > 0) {
     const cacheAge = Date.now() - new Date(certificates[0].created_at).getTime();
-    if (cacheAge < 3600000) {
+    if (cacheAge < 3600000) { // 1 hour cache
       return certificates;
     }
   }
@@ -108,6 +117,7 @@ serve(async (req) => {
 
     console.log(`Searching certificates for ${filter}: ${query}`);
     
+    // Check cache first
     const cachedResults = await checkCachedResults(query, filter);
     if (cachedResults) {
       console.log('Returning cached results');
@@ -117,10 +127,12 @@ serve(async (req) => {
       );
     }
 
+    // If not in cache, fetch from crt.sh with retry mechanism
     const searchUrl = buildSearchUrl(query, filter);
     const response = await fetchWithRetry(searchUrl);
     const data = await response.json();
     
+    // Store results in cache
     await storeCertificates(data, query);
     
     return new Response(

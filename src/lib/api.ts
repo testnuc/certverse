@@ -1,5 +1,7 @@
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveQuery } from "./database";
+import { fetchWithRetry } from "./utils";
 
 export interface Certificate {
   issuer_ca_id: number;
@@ -20,11 +22,10 @@ export const searchCertificates = async (
   filter: SearchFilter = "domain"
 ): Promise<Certificate[]> => {
   try {
-    // Store the search query
-    await supabase
-      .from('domain_searches')
-      .insert([{ domain: query }]);
+    // First save the search query
+    await saveQuery(query, filter);
 
+    // Then perform the search via Edge Function with retry mechanism
     const { data, error } = await supabase.functions.invoke('search-certificates', {
       body: { query, filter }
     });
@@ -41,7 +42,7 @@ export const searchCertificates = async (
     return data;
   } catch (error) {
     console.error('Error fetching certificates:', error);
-    toast.error("Failed to fetch certificates");
+    toast.error("Failed to fetch certificates. Retrying...");
     return [];
   }
 };
